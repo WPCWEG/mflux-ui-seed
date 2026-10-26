@@ -1,23 +1,24 @@
 {% extends "base.html" %}
-{% block title %}Gallery · mflux{% endblock %}
+{% block title_key %}gallery.title{% endblock %}
+{% block title %}{{ t('gallery.title') }} · mflux{% endblock %}
 {% block main_class %}gallery-layout{% endblock %}
 {% block content %}
 <div class="gallery-header">
-  <h1>Gallery</h1>
+  <h1 data-i18n="gallery.heading">{{ t('gallery.heading') }}</h1>
   <span id="gallery-count" class="muted"></span>
 </div>
 <div id="gallery-grid" class="gallery-grid"></div>
-<div class="center"><button id="gallery-more" class="ghost" hidden>Load more</button></div>
+<div class="center"><button id="gallery-more" class="ghost" data-i18n="gallery.load_more" hidden>{{ t('gallery.load_more') }}</button></div>
 <dialog id="viewer" class="viewer">
-  <form method="dialog" class="viewer-close"><button class="ghost small" aria-label="Close">Close</button></form>
+  <form method="dialog" class="viewer-close"><button class="ghost small" aria-label="{{ t('action.close') }}" data-i18n-aria="action.close" data-i18n="action.close">{{ t('action.close') }}</button></form>
   <img id="viewer-image" alt="">
   <div class="viewer-side">
     <p id="viewer-prompt" class="viewer-prompt"></p>
     <dl id="viewer-meta" class="meta-list"></dl>
     <div class="actions">
-      <button id="viewer-reuse" class="primary small">Reuse settings</button>
-      <a id="viewer-download" class="button ghost small" download>Download</a>
-      <button id="viewer-delete" class="ghost small danger">Delete</button>
+      <button id="viewer-reuse" class="primary small" data-i18n="gallery.reuse">{{ t('gallery.reuse') }}</button>
+      <a id="viewer-download" class="button ghost small" data-i18n="gallery.download" download>{{ t('gallery.download') }}</a>
+      <button id="viewer-delete" class="ghost small danger" data-i18n="gallery.delete">{{ t('gallery.delete') }}</button>
     </div>
   </div>
 </dialog>

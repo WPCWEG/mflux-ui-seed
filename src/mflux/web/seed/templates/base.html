@@ -1,35 +1,50 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ locale }}">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}mflux{% endblock %}</title>
+  <title data-title-key="{% block title_key %}{% endblock %}">{% block title %}mflux{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/static/app.css">
 </head>
+
 <body data-page="{{ page }}">
   <header class="topbar">
     <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>mflux</a>
     {% if page not in ("login", "setup") %}
     <nav class="tabs">
-      <a href="/" class="{{ 'active' if page == 'generate' }}">Generate</a>
-      <a href="/gallery" class="{{ 'active' if page == 'gallery' }}">Gallery</a>
+      <a href="/" class="{{ 'active' if page == 'generate' }}" data-i18n="nav.generate">{{ t('nav.generate') }}</a>
+      <a href="/gallery" class="{{ 'active' if page == 'gallery' }}" data-i18n="nav.gallery">{{ t('nav.gallery') }}</a>
     </nav>
+    {% endif %}
     <div class="topbar-right">
+      {% if page not in ("login", "setup") %}
       {% if page == "generate" %}
-      <button id="topbar-generate" class="primary small" type="button" title="Generate (⌘/Ctrl + Enter)" form="generate-form">Generate</button>
+      <button id="topbar-generate" class="primary small" type="button" title="{{ t('topbar.generate_title') }}"
+        data-i18n-title="topbar.generate_title" data-i18n="topbar.generate" form="generate-form">{{ t('topbar.generate') }}</button>
       {% endif %}
       <span id="worker-status" class="pill muted">idle</span>
-      <button id="unload-model" class="ghost small" type="button" title="Free the loaded model's memory now" hidden>Unload</button>
-      <button id="logout" class="ghost small" hidden>Log out</button>
+      <button id="unload-model" class="ghost small" type="button" title="{{ t('topbar.unload_title') }}"
+        data-i18n-title="topbar.unload_title" data-i18n="topbar.unload" hidden>{{ t('topbar.unload') }}</button>
+      <button id="logout" class="ghost small" data-i18n="topbar.logout" hidden>{{ t('topbar.logout') }}</button>
+      {% endif %}
+      <label class="lang-switch" title="{{ t('language.label') }}" data-i18n-title="language.label">
+        <select id="language-select" aria-label="{{ t('language.label') }}" data-i18n-aria="language.label">
+          <option value="zh-CN" {% if locale=='zh-CN' %}selected{% endif %}>中文</option>
+          <option value="en" {% if locale=='en' %}selected{% endif %}>English</option>
+        </select>
+      </label>
     </div>
-    {% endif %}
   </header>
   <main class="{% block main_class %}{% endblock %}">
     {% block content %}{% endblock %}
   </main>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <div id="i18n-data" hidden>{{ {'locale': locale, 'catalogs': i18n_catalogs}|tojson }}</div>
+  <script src="/static/i18n.js"></script>
   <script src="/static/common.js"></script>
   {% block scripts %}{% endblock %}
 </body>
+
 </html>

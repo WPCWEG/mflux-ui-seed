@@ -66,6 +66,25 @@ h1 { font-size: 20px; margin: 0; font-weight: 600; }
 .tabs a:hover { color: var(--text); background: var(--surface-2); }
 .tabs a.active { color: var(--text); background: var(--surface); box-shadow: var(--shadow); border: 1px solid var(--border); }
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.lang-switch { display: inline-flex; align-items: center; }
+.lang-switch select {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.lang-switch select:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0;
+}
 
 .pill { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); }
 .pill.busy { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }

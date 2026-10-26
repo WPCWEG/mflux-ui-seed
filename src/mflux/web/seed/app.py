@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from mflux.web.seed.auth import REMEMBER_ME_MAX_AGE, SESSION_COOKIE_NAME, SESSION_MAX_AGE, LoginThrottle, WebAuth
+from mflux.web.seed.i18n import jinja_t, template_context
 from mflux.web.seed.invocation import Invocation, InvocationError
 from mflux.web.seed.network import NetworkPolicy
 from mflux.web.seed.paths import PathGuard, PathRejected
@@ -45,7 +46,11 @@ class WebApp:
         self.runner = runner or JobRunner(
             cache_size=settings.cache_size, idle_unload_seconds=settings.idle_unload_minutes * 60
         )
-        self.templates = Jinja2Templates(directory=str(WEB_DIR / "templates"))
+        self.templates = Jinja2Templates(
+            directory=str(WEB_DIR / "templates"),
+            context_processors=[template_context],
+        )
+        self.templates.env.globals["t"] = jinja_t
         self.app = self._build()
 
     @property
@@ -122,6 +127,8 @@ class WebApp:
         response = await call_next(request)
         if path.startswith("/api/"):
             response.headers.setdefault("Cache-Control", "no-store")
+        elif path in ("/", "/gallery", "/login", "/setup"):
+            response.headers.setdefault("Cache-Control", "private, no-store")
         return WebApp._secured(response)
 
     def _is_authenticated(self, request: Request) -> bool:
@@ -248,6 +255,8 @@ class WebApp:
 
         @app.post("/api/generate")
         async def generate(request: Request):
+            if self.runner.stopping:
+                raise HTTPException(503, "Server is stopping; no new jobs accepted")
             payload = await WebApp._json(request)
             preview_every = WebApp._preview_every(payload.get("preview_every"))
             invocation = self._invocation(payload)
@@ -255,7 +264,10 @@ class WebApp:
                 await asyncio.to_thread(invocation.validate)
             except InvocationError as exc:
                 raise HTTPException(400, str(exc)) from exc
-            job = self.runner.submit(invocation, payload, preview_every=preview_every)
+            try:
+                job = self.runner.submit(invocation, payload, preview_every=preview_every)
+            except InvocationError as exc:
+                raise HTTPException(503, str(exc)) from exc
             return job.snapshot()
 
         @app.get("/api/jobs")
@@ -295,11 +307,12 @@ class WebApp:
                 while True:
                     if await request.is_disconnected():
                         return
+                    done = job.finished or self.runner.stopping
                     fresh = job.events_since(seq)
                     for event in fresh:
                         yield f"data: {json.dumps(event)}\n\n"
                     seq += len(fresh)
-                    if job.finished and not fresh:
+                    if done and not fresh:
                         return
                     if time.monotonic() - last_beat > 15:
                         last_beat = time.monotonic()

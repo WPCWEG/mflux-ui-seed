@@ -64,7 +64,8 @@ const MF = (() => {
   async function copy(text) {
     try {
       await navigator.clipboard.writeText(text);
-      toast("Copied to clipboard");
+      const msg = window.UI18n ? window.UI18n.t("action.copied_to_clipboard", {}, "Copied to clipboard") : "Copied to clipboard";
+      toast(msg);
     } catch {
       window.prompt("Copy this command:", text);
     }
@@ -77,14 +78,40 @@ const MF = (() => {
       const status = await api("/api/status");
       const memory = status.memory || {};
       const model = status.cached_models.length ? status.cached_models[0].model : null;
-      let label = "idle";
-      if (status.loading) label = `loading ${status.loading}`;
-      else if (status.current_job) label = status.queued ? `busy · ${status.queued} queued` : "busy";
-      else if (model) label = `ready · ${model}`;
-      if (memory.active_gb !== undefined) label += ` · ${memory.active_gb.toFixed(1)} GB`;
+      const t = (k, p, d) => (window.UI18n ? window.UI18n.t(k, p, d) : d || k);
+
+      let label = t("worker.idle", {}, "idle");
+      if (status.loading) label = t("worker.loading", { model: status.loading }, `loading ${status.loading}`);
+      else if (status.current_job) label = status.queued ? t("worker.busy_queued", { queued: status.queued }, `busy · ${status.queued} queued`) : t("worker.busy", {}, "busy");
+      else if (model) label = t("worker.ready", { model }, `ready · ${model}`);
+      if (memory.active_gb !== undefined) label += ` · ${memory.active_gb.toFixed(1)} GiB`;
       pill.textContent = label;
-      const details = [`MLX memory in use: ${memory.active_gb} GB`, `MLX buffer cache: ${memory.cache_gb} GB`];
-      if (model && status.unload_in !== null) details.push(`Unloads after ${Math.ceil(status.unload_in / 60)} more idle min`);
+
+      const details = [
+        t("worker.active_mem", { mem: memory.active_gb }, `MLX active memory: ${memory.active_gb} GiB`),
+        t("worker.cache_mem", { mem: memory.cache_gb }, `MLX buffer cache: ${memory.cache_gb} GiB`),
+      ];
+      if (status.limits && status.limits.baseline_memory_limit_gib) {
+        details.push(
+          t(
+            "worker.baseline",
+            {
+              mem: status.limits.baseline_memory_limit_gib,
+              cache: status.limits.baseline_cache_limit_gib,
+            },
+            `Baseline: ${status.limits.baseline_memory_limit_gib} GiB memory · ${status.limits.baseline_cache_limit_gib} GiB cache`
+          )
+        );
+      }
+      if (model && status.unload_in !== null) {
+        details.push(
+          t(
+            "worker.unloads_in",
+            { min: Math.ceil(status.unload_in / 60) },
+            `Unloads after ${Math.ceil(status.unload_in / 60)} more idle min`
+          )
+        );
+      }
       pill.title = details.join("\n");
       pill.classList.toggle("busy", Boolean(status.loading || status.current_job));
       const unload = document.getElementById("unload-model");
@@ -95,7 +122,8 @@ const MF = (() => {
   async function unloadModel() {
     try {
       await api("/api/models/unload", { method: "POST" });
-      toast("Unloading model…");
+      const msg = window.UI18n ? window.UI18n.t("topbar.unloading", {}, "Unloading model…") : "Unloading model…";
+      toast(msg);
       setTimeout(pollStatus, 800);
     } catch (exc) {
       toast(exc.message);
@@ -117,6 +145,7 @@ const MF = (() => {
     if (document.getElementById("worker-status") && current.authenticated) {
       pollStatus();
       setInterval(pollStatus, 3000);
+      document.addEventListener("languagechange", pollStatus);
     }
     return current;
   }

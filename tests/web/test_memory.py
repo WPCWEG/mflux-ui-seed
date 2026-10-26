@@ -119,3 +119,94 @@ def test_qwen21_geometry_cache_is_bounded():
     assert len(transformer._geometry_cache) == Qwen21Transformer.GEOMETRY_CACHE_SIZE
     assert (49, 4, 4) in transformer._geometry_cache
     assert (1, 4, 4) not in transformer._geometry_cache
+
+
+def test_jobrunner_baseline_memory_and_cache_limits(tmp_path):
+    assert JobRunner.DEFAULT_MEMORY_LIMIT_BYTES == 16 * 1024**3
+    assert JobRunner.DEFAULT_CACHE_LIMIT_BYTES == 1 * 1024**3
+    runner = JobRunner(cache_size=1, idle_unload_seconds=0)
+    runner.start()
+    try:
+        limits = runner.status()["limits"]
+        assert limits["baseline_memory_limit_bytes"] == 17_179_869_184
+        assert limits["baseline_cache_limit_bytes"] == 1_073_741_824
+        assert limits["memory_limit_gib"] == 16.0
+        assert limits["cache_limit_gib"] == 1.0
+    finally:
+        runner.stop()
+
+
+def test_jobrunner_limits_restored_after_custom_job_cache_limit(runner, tmp_path):
+    job = wait(runner.submit(FakeInvocation(FakeAdapter(), tmp_path, mlx_cache_limit_gb=0.5), {}))
+    assert job.status == "done"
+    limits = runner.status()["limits"]
+    assert limits["cache_limit_bytes"] == 1_073_741_824
+    assert limits["memory_limit_bytes"] == 17_179_869_184
+
+
+def test_jobrunner_limits_restored_after_job_error(runner, tmp_path):
+    class FailingAdapter(FakeAdapter):
+        def generate(self, model, args, seed, prompt):
+            raise RuntimeError("Simulation error during generation")
+
+    job = wait(runner.submit(FakeInvocation(FailingAdapter(), tmp_path, mlx_cache_limit_gb=0.5), {}))
+    assert job.status == "error"
+    limits = runner.status()["limits"]
+    assert limits["cache_limit_bytes"] == 1_073_741_824
+    assert limits["memory_limit_bytes"] == 17_179_869_184
+
+
+def test_jobrunner_limits_restored_after_job_cancellation(runner, tmp_path):
+    job = runner.submit(FakeInvocation(FakeAdapter(), tmp_path, mlx_cache_limit_gb=0.5), {})
+    runner.cancel(job.id)
+    wait(job)
+    assert job.status == "cancelled"
+    limits = runner.status()["limits"]
+    assert limits["cache_limit_bytes"] == 1_073_741_824
+    assert limits["memory_limit_bytes"] == 17_179_869_184
+
+
+def test_excessive_cache_limit_rejected(tmp_path):
+    from mflux.web.seed.invocation import Invocation, InvocationError
+    from mflux.web.seed.paths import PathGuard
+    from mflux.web.seed.schema import FormSchema
+
+    guard = PathGuard(tmp_path / "out", tmp_path / "uploads", [], [])
+    schema = FormSchema()
+    payload = {
+        "command": "mflux-generate-qwen-2.1",
+        "options": {
+            "--prompt": "x",
+            "--mlx-cache-limit-gb": 20.0,
+        },
+    }
+    with pytest.raises(InvocationError, match="must be between 0.1 and 16"):
+        Invocation.from_payload(payload, guard, schema, tmp_path / "out/test")
+
+
+def test_limits_snapshot_does_not_mutate_mlx_limits_and_exposes_gib(runner, monkeypatch):
+    limits = runner.status()["limits"]
+    assert limits["baseline_memory_limit_gib"] == 16.0
+    assert limits["baseline_cache_limit_gib"] == 1.0
+
+    call_count = {"mem": 0, "cache": 0}
+    orig_set_mem = mx.set_memory_limit
+    orig_set_cache = mx.set_cache_limit
+
+    def tracked_set_mem(val):
+        call_count["mem"] += 1
+        return orig_set_mem(val)
+
+    def tracked_set_cache(val):
+        call_count["cache"] += 1
+        return orig_set_cache(val)
+
+    monkeypatch.setattr(mx, "set_memory_limit", tracked_set_mem)
+    monkeypatch.setattr(mx, "set_cache_limit", tracked_set_cache)
+
+    for _ in range(5):
+        _ = runner.status()
+        _ = runner.limits_snapshot()
+
+    assert call_count["mem"] == 0
+    assert call_count["cache"] == 0

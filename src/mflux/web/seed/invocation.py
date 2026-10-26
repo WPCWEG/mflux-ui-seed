@@ -25,6 +25,7 @@ class Invocation:
     output_stem: Path
     lora_argv: list[str] = field(default_factory=list)
     provided_flags: set[str] = field(default_factory=set)
+    raw_options: dict = field(default_factory=dict)
 
     # parse_args() reads sys.argv and flips two process-wide flags, so every parse and every
     # save that depends on those flags runs under this lock.
@@ -35,7 +36,7 @@ class Invocation:
     NUMBER_BOUNDS = {
         "--steps": (1, 1000),
         "--guidance": (-100, 100),
-        "--mlx-cache-limit-gb": (0.1, 1024),
+        "--mlx-cache-limit-gb": (0.1, 16.0),
         "--vae-tile-size": (128, 8192),
         "--battery-percentage-stop-limit": (1, 99),
         "--pid-degrade-sigma": (0, 100),
@@ -57,10 +58,13 @@ class Invocation:
         options = payload.get("options") or {}
         if not isinstance(options, dict):
             raise InvocationError("options must be an object")
+        tiling_disabled = options.get("--vae-tiling") is False
         for flag, value in options.items():
             spec = fields.get(flag)
             if spec is None:
                 raise InvocationError(f"Option not allowed: {flag}")
+            if flag == "--vae-tile-size" and tiling_disabled:
+                continue
             tokens = Invocation._option_tokens(spec, value)
             if tokens:
                 argv.extend(tokens)
@@ -78,7 +82,7 @@ class Invocation:
             raise InvocationError("A prompt of '-' (read from stdin) is not supported in the web UI")
 
         argv.extend(["--metadata", f"--output={output_stem}.png"])
-        return Invocation(command, argv, output_stem, lora_argv, provided)
+        return Invocation(command, argv, output_stem, lora_argv, provided, raw_options=dict(options))
 
     @property
     def adapter(self) -> CommandAdapter:
@@ -88,7 +92,9 @@ class Invocation:
         argv = self.argv + (self.lora_argv if include_loras else [])
         with Invocation.LOCK, Invocation._restored_globals():
             args, messages = Invocation._parse(self.adapter, self.command, argv)
+        args.web_command = self.command
         args.web_provided_flags = set(self.provided_flags)
+        args.web_raw_options = dict(self.raw_options)
         args.web_messages = messages
         return args
 
@@ -96,6 +102,11 @@ class Invocation:
         # LoRA arguments are left out: resolving them may download from the Hub, which the
         # worker does when the job actually runs. PathGuard has already vetted them.
         args = self.parse(include_loras=False)
+        if getattr(args, "mlx_cache_limit_gb", None) is not None:
+            if not (0.1 <= args.mlx_cache_limit_gb <= 16.0):
+                raise InvocationError(
+                    f"--mlx-cache-limit-gb ({args.mlx_cache_limit_gb:g} GiB) exceeds the host memory guideline of 16 GiB"
+                )
         try:
             self.adapter.validate(args)
         except (AdapterError, ValueError) as exc:

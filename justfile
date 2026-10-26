@@ -1,10 +1,10 @@
-# justfile for the mflux-ui-seed Python 3.12+ project, using 3.13 as recommended maintainer Python
+# justfile for the mflux-ui-seed Python 3.12+ project, matching Yanlume Python 3.12.15
 # Adapted from the mflux core justfile: github.com/mflux-community/mflux (the plumbing this UI seed uses).
 # The mflux.web namespace model this seed targets is defined by mflux PR #776.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-python_version := "3.13"
+python_version := "3.12.15"
 venv_dir := ".venv"
 # Ruff version derives from the pinned dev dependency in pyproject.toml (single source of truth)
 ruff_version := `sed -n 's/^    "ruff==\([0-9.]*\)",$/\1/p' pyproject.toml`
@@ -23,7 +23,7 @@ venv-install: venv-init ensure-pre-commit
       echo "✅ ran git init"; \
     fi
     @echo "🏗️ Installing dependencies and pre-commit hooks..."
-    uv sync --python {{ python_version }}
+    uv sync --locked --python {{ python_version }}
     @echo "✅ Dependencies installed."
     pre-commit install
     @echo "✅ Pre-commit hooks installed."
@@ -59,7 +59,7 @@ dev-format:
 # Run ty type checker (version pinned via pyproject.toml dev deps + uv.lock)
 dev-typecheck:
     @echo "🏗️ Running ty type checker (pinned via pyproject.toml)..."
-    uv sync --all-extras
+    uv sync --locked --all-extras
     uv run --no-sync ty check
     @echo "✅ Type checking complete."
 
@@ -120,7 +120,7 @@ ensure-pre-commit:
 [private]
 _test-run args="":
     @echo "🏗️ Syncing locked environment with dev extras..."
-    uv sync --all-extras
+    uv sync --locked --all-extras
     @echo "🏗️ Running pytest (see command line for selector)..."
     uv run --no-sync python -m pytest {{ args }}
     @echo "✅ Tests completed"

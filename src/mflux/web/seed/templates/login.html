@@ -1,15 +1,16 @@
 {% extends "base.html" %}
-{% block title %}Log in · mflux{% endblock %}
+{% block title_key %}login.title{% endblock %}
+{% block title %}{{ t('login.title') }} · mflux{% endblock %}
 {% block main_class %}auth-layout{% endblock %}
 {% block content %}
 <form id="login-form" class="panel auth-card">
-  <h1>Log in</h1>
+  <h1 data-i18n="login.heading">{{ t('login.heading') }}</h1>
   <label class="field">
-    <span class="label">API key</span>
+    <span class="label" data-i18n="login.api_key">{{ t('login.api_key') }}</span>
     <input type="password" id="api-key" autocomplete="current-password" required autofocus>
   </label>
-  <label class="check"><input type="checkbox" id="remember"> Keep me logged in for 30 days</label>
-  <button type="submit" class="primary">Log in</button>
+  <label class="check"><input type="checkbox" id="remember"> <span data-i18n="login.remember">{{ t('login.remember') }}</span></label>
+  <button type="submit" class="primary" data-i18n="login.submit">{{ t('login.submit') }}</button>
   <p id="auth-error" class="error" hidden></p>
 </form>
 {% endblock %}

@@ -86,57 +86,183 @@
 
   function renderField(field) {
     const id = `field-${field.flag.replace(/[^a-z0-9]/gi, "-")}`;
-    const status = field.status === "conditional" ? el("span", { class: "status", title: field.condition, text: "conditional" }) : null;
-    const hint = field.help ? el("small", { class: "hint", text: field.help }) : null;
+    const flagKey = field.flag.replace(/^--/, "").replace(/-/g, "_");
+    const labelKey = `field.${flagKey}.label`;
+    const hintKey = `field.${flagKey}.help`;
+
+    const labelText = UI18n.t(labelKey, {}, field.label);
+    const labelSpan = el("span", {
+      "data-i18n": labelKey,
+      "data-i18n-default": field.label,
+      text: labelText,
+    });
+
+    const status =
+      field.status === "conditional"
+        ? el("span", {
+            class: "status",
+            title: field.condition,
+            "data-i18n": "field.conditional",
+            "data-i18n-default": "conditional",
+            text: UI18n.t("field.conditional", {}, "conditional"),
+          })
+        : null;
+
+    const hint = field.help
+      ? el("small", {
+          class: "hint",
+          "data-i18n": hintKey,
+          "data-i18n-default": field.help,
+          text: UI18n.t(hintKey, {}, field.help),
+        })
+      : null;
+
     const common = { id, "data-flag": field.flag, "data-widget": field.widget, title: field.condition || "" };
 
     if (field.widget === "checkbox") {
       const input = el("input", { ...common, type: "checkbox" });
       input.checked = field.default === true;
-      return el("label", { class: "check wide", title: field.help }, input, el("span", { text: field.label }), status);
+      return el("label", { class: "check wide", title: field.help }, input, labelSpan, status);
     }
 
     let input;
     if (field.widget === "textarea") {
-      input = el("textarea", { ...common, placeholder: field.flag === "--prompt" ? "Describe the image" : "" });
+      const promptPlaceholder =
+        field.flag === "--prompt" ? UI18n.t("form.prompt_placeholder", {}, "Describe the image") : "";
+      const attrs = { ...common, placeholder: promptPlaceholder };
+      if (field.flag === "--prompt") {
+        attrs["data-i18n-placeholder"] = "form.prompt_placeholder";
+        attrs["data-i18n-placeholder-default"] = "Describe the image";
+      }
+      input = el("textarea", attrs);
     } else if (field.widget === "select") {
-      const defaultLabel = field.default === null || field.default === undefined ? "Default" : `Default (${field.default})`;
-      input = el("select", common, el("option", { value: "", text: defaultLabel }), ...field.choices.map((c) => el("option", { value: c, text: c })));
+      const isNullDef = field.default === null || field.default === undefined;
+      const defLabel = isNullDef
+        ? UI18n.t("field.default", {}, "Default")
+        : UI18n.t("field.default_with_val", { val: field.default }, `Default (${field.default})`);
+      const defOption = el("option", {
+        value: "",
+        "data-i18n": isNullDef ? "field.default" : "field.default_with_val",
+        "data-i18n-default": defLabel,
+        text: defLabel,
+      });
+      input = el("select", common, defOption, ...field.choices.map((c) => el("option", { value: c, text: c })));
     } else if (field.widget === "number") {
-      input = el("input", { ...common, type: "number", step: field.type === "int" ? "1" : "any", placeholder: field.default ?? "auto" });
+      const autoText = UI18n.t("field.steps.auto", {}, "auto");
+      const placeholder = field.default ?? autoText;
+      const attrs = {
+        ...common,
+        type: "number",
+        step: field.type === "int" ? "1" : "any",
+        placeholder: String(placeholder),
+      };
+      if (field.default === null || field.default === undefined) {
+        attrs["data-i18n-placeholder"] = "field.steps.auto";
+        attrs["data-i18n-placeholder-default"] = "auto";
+      }
+      input = el("input", attrs);
     } else {
-      input = el("input", { ...common, placeholder: field.default ?? "auto" });
+      const autoText = UI18n.t("field.steps.auto", {}, "auto");
+      const placeholder = field.default ?? autoText;
+      const attrs = { ...common, placeholder: String(placeholder) };
+      if (field.default === null || field.default === undefined) {
+        attrs["data-i18n-placeholder"] = "field.steps.auto";
+        attrs["data-i18n-placeholder-default"] = "auto";
+      }
+      input = el("input", attrs);
     }
     const wide = field.widget === "textarea" || field.flag === "--base-model" ? " wide" : "";
-    return el("label", { class: `field${wide}`, "data-field": field.flag }, el("span", { class: "label" }, el("span", { text: field.label }), status), input, field.widget === "textarea" ? null : hint);
+    return el(
+      "label",
+      { class: `field${wide}`, "data-field": field.flag },
+      el("span", { class: "label" }, labelSpan, status),
+      input,
+      field.widget === "textarea" ? null : hint
+    );
+  }
+
+  function renderMegapixelOptions(currentVal = 1) {
+    return MEGAPIXELS.map((mp) =>
+      el("option", {
+        value: mp,
+        text: UI18n.t("size.megapixels", { mp }, `~${mp} MP`),
+        selected: mp === currentVal,
+      })
+    );
   }
 
   function renderSizePicker() {
     const chips = el("div", { class: "presets", id: "size-presets" });
     for (const [label, w, h] of SIZE_PRESETS) {
-      chips.append(el("button", { type: "button", "data-w": w, "data-h": h, text: `${label} · ${w}×${h}`, onclick: () => applySize(w, h) }));
+      chips.append(
+        el("button", {
+          type: "button",
+          "data-w": w,
+          "data-h": h,
+          text: `${label} · ${w}×${h}`,
+          onclick: () => applySize(w, h),
+        })
+      );
     }
-    const ratio = el("select", { id: "aspect-ratio", "aria-label": "Aspect ratio" });
-    const megapixels = el("select", { id: "megapixels", "aria-label": "Resolution" },
-      ...MEGAPIXELS.map((mp) => el("option", { value: mp, text: `~${mp} MP`, selected: mp === 1 })));
+    const ratio = el("select", {
+      id: "aspect-ratio",
+      "aria-label": UI18n.t("size.aspect_ratio_aria", {}, "Aspect ratio"),
+      "data-i18n-aria": "size.aspect_ratio_aria",
+      "data-i18n-aria-default": "Aspect ratio",
+    });
+    const megapixels = el(
+      "select",
+      {
+        id: "megapixels",
+        "aria-label": UI18n.t("size.resolution_aria", {}, "Resolution"),
+        "data-i18n-aria": "size.resolution_aria",
+        "data-i18n-aria-default": "Resolution",
+      },
+      ...renderMegapixelOptions(1)
+    );
     ratio.addEventListener("change", applyRatio);
     megapixels.addEventListener("change", () => {
       renderRatioOptions();
       applyRatio();
     });
-    const picker = el("div", { class: "size-picker" },
+    const picker = el(
+      "div",
+      { class: "size-picker" },
       chips,
-      el("div", { class: "size-selects" },
-        el("label", { class: "field" }, el("span", { class: "label", text: "More sizes" }), ratio),
-        el("label", { class: "field" }, el("span", { class: "label", text: "Resolution" }), megapixels),
-      ),
+      el(
+        "div",
+        { class: "size-selects" },
+        el(
+          "label",
+          { class: "field" },
+          el("span", {
+            class: "label",
+            "data-i18n": "size.more_sizes",
+            "data-i18n-default": "More sizes",
+            text: UI18n.t("size.more_sizes", {}, "More sizes"),
+          }),
+          ratio
+        ),
+        el(
+          "label",
+          { class: "field" },
+          el("span", {
+            class: "label",
+            "data-i18n": "size.resolution",
+            "data-i18n-default": "Resolution",
+            text: UI18n.t("size.resolution", {}, "Resolution"),
+          }),
+          megapixels
+        )
+      )
     );
     requestAnimationFrame(renderRatioOptions);
     return picker;
   }
 
   function ratioDimensions(ratioW, ratioH, megapixels) {
-    const snap = (value) => Math.min(MAX_DIMENSION, Math.max(DIMENSION_STEP, Math.round(value / DIMENSION_STEP) * DIMENSION_STEP));
+    const snap = (value) =>
+      Math.min(MAX_DIMENSION, Math.max(DIMENSION_STEP, Math.round(value / DIMENSION_STEP) * DIMENSION_STEP));
     const width = Math.sqrt((megapixels * 1e6 * ratioW) / ratioH);
     return [snap(width), snap((width * ratioH) / ratioW)];
   }
@@ -146,12 +272,25 @@
     if (!select) return;
     const mp = Number($("megapixels").value);
     const current = select.value;
-    select.replaceChildren(el("option", { value: "", text: "Custom / choose a ratio…" }));
+    select.replaceChildren(
+      el("option", {
+        value: "",
+        text: UI18n.t("size.custom_ratio", {}, "Custom / choose a ratio…"),
+      })
+    );
     for (const [group, ratios] of Object.entries(ASPECT_RATIOS)) {
-      select.append(el("optgroup", { label: group }, ...ratios.map(([label, rw, rh]) => {
-        const [w, h] = ratioDimensions(rw, rh, mp);
-        return el("option", { value: `${rw}:${rh}`, text: `${label} — ${w}×${h}` });
-      })));
+      const groupKey = `size.group.${group.toLowerCase()}`;
+      const groupLabel = UI18n.t(groupKey, {}, group);
+      select.append(
+        el(
+          "optgroup",
+          { label: groupLabel },
+          ...ratios.map(([label, rw, rh]) => {
+            const [w, h] = ratioDimensions(rw, rh, mp);
+            return el("option", { value: `${rw}:${rh}`, text: `${label} — ${w}×${h}` });
+          })
+        )
+      );
     }
     select.value = current;
     updatePresetHighlight();
@@ -217,16 +356,53 @@
     const steps = fieldInput("--steps");
     if (!steps || !state.command) return;
     const source = modelSource();
-    const name = source === "builtin" ? $("model-builtin").value : (getValue("--base-model") || state.command.models[0]?.name);
-    const model = state.command.models.find((m) => m.name === name) || state.command.models[0];
-    steps.placeholder = model ? `${model.default_steps} (model default)` : "auto";
+    let defaultSteps = state.command.models[0]?.default_steps;
+    if (source === "builtin") {
+      const name = $("model-builtin").value;
+      const model = state.command.models.find((m) => m.name === name);
+      if (model) defaultSteps = model.default_steps;
+    } else if (source === "local") {
+      const localVal = ($("model-local").value || "").toLowerCase();
+      if (localVal.includes("turbo")) {
+        const turboModel = state.command.models.find((m) => m.name.includes("turbo"));
+        if (turboModel) defaultSteps = turboModel.default_steps;
+      } else {
+        const base = getValue("--base-model");
+        const model = state.command.models.find((m) => m.name === base);
+        if (model) defaultSteps = model.default_steps;
+      }
+    }
+    steps.placeholder = defaultSteps
+      ? UI18n.t("field.steps.model_default", { steps: defaultSteps }, `${defaultSteps} (model default)`)
+      : UI18n.t("field.steps.auto", {}, "auto");
   }
 
   function addLoraRow(path = "", scale = 1.0) {
-    const row = el("div", { class: "lora-row" },
-      el("input", { class: "lora-path", list: "lora-options", placeholder: "path, org/repo, or name", value: path }),
+    const placeholder = UI18n.t("lora.path_placeholder", {}, "path, org/repo, or name");
+    const removeText = UI18n.t("lora.remove", {}, "Remove");
+    const row = el(
+      "div",
+      { class: "lora-row" },
+      el("input", {
+        class: "lora-path",
+        list: "lora-options",
+        placeholder,
+        "data-i18n-placeholder": "lora.path_placeholder",
+        "data-i18n-placeholder-default": "path, org/repo, or name",
+        value: path,
+      }),
       el("input", { class: "lora-scale", type: "number", step: "0.05", min: "-4", max: "4", value: scale }),
-      el("button", { type: "button", class: "ghost small", text: "Remove", onclick: () => { row.remove(); updateNotes(); } }),
+      el("button", {
+        type: "button",
+        class: "ghost small",
+        text: removeText,
+        "data-i18n": "lora.remove",
+        "data-i18n-default": "Remove",
+        onclick: () => {
+          row.remove();
+          updateNotes();
+        },
+      })
     );
     $("lora-rows").append(row);
     updateNotes();
@@ -234,8 +410,8 @@
 
   function updateNotes() {
     const count = document.querySelectorAll(".lora-row").length;
-    $("lora-note").textContent = count ? `${count} active` : "";
-    $("img2img-note").textContent = state.upload ? "image set" : "";
+    $("lora-note").textContent = count ? UI18n.t("lora.active_count", { count }, `${count} active`) : "";
+    $("img2img-note").textContent = state.upload ? UI18n.t("init_image.set", {}, "image set") : "";
   }
 
   // ---------- payload ----------
@@ -299,7 +475,7 @@
     if (!file) return;
     const form = new FormData();
     form.append("file", file);
-    $("dropzone-text").textContent = "Uploading…";
+    $("dropzone-text").textContent = UI18n.t("init_image.uploading", {}, "Uploading…");
     try {
       const result = await MF.api("/api/uploads", { method: "POST", form });
       setUpload(result.id, URL.createObjectURL(file));
@@ -315,7 +491,7 @@
     img.hidden = !id;
     if (previewUrl) img.src = previewUrl;
     $("dropzone-text").hidden = Boolean(id);
-    $("dropzone-text").textContent = "Drop an image or click to choose";
+    $("dropzone-text").textContent = UI18n.t("form.dropzone_text", {}, "Drop an image or click to choose");
     if (!id) $("init-image").value = "";
     updateNotes();
   }
@@ -360,12 +536,30 @@
     $("job-results").replaceChildren();
     $("job-command").textContent = job.shell_command;
     $("cancel-job").hidden = ["done", "error", "cancelled"].includes(job.status);
-    setStatus("Queued", "");
+    showError(job.status === "error" ? (job.error || "") : "");
+    showWarnings(job.messages || []);
+    const initKey = job.status === "running" ? "job.status.generating" : "job.status.queued";
+    setStatus(UI18n.t(initKey, {}, capitalize(job.status)), "");
     setProgress(null);
     for (const name of job.images || []) addResult(name);
-    if (job.images && job.images.length) showImage(`/api/images/${encodeURIComponent(job.images.at(-1))}`, false);
+    if (job.images && job.images.length) {
+      showImage(`/api/images/${encodeURIComponent(job.images.at(-1))}`, false);
+    } else {
+      $("stage-image").hidden = true;
+      $("stage-image").removeAttribute("src");
+      $("stage-image").classList.remove("preview");
+    }
     if (["done", "error", "cancelled"].includes(job.status)) {
-      setStatus(capitalize(job.status), job.error || "");
+      let detail = job.error || "";
+      if (job.status === "done" && !detail && job.images) {
+        detail = UI18n.t(
+          "job.status.saved_count",
+          { count: job.images.length, plural: job.images.length === 1 ? "" : "s" },
+          `${job.images.length} image${job.images.length === 1 ? "" : "s"} saved`
+        );
+      }
+      const statusKey = job.status === "error" ? "job.status.failed" : `job.status.${job.status}`;
+      setStatus(UI18n.t(statusKey, {}, capitalize(job.status)), detail);
       setProgress(job.status === "done" ? 1 : 0);
       return;
     }
@@ -383,32 +577,65 @@
   }
 
   function handleEvent(job, event) {
+    job._lastEvent = event;
+    renderEventStatus(job, event);
+  }
+
+  function renderEventStatus(job, event) {
+    if (!event) return;
     switch (event.type) {
       case "queued":
-        setStatus("Queued", event.position > 1 ? `position ${event.position}` : "");
+        setStatus(
+          UI18n.t("job.status.queued", {}, "Queued"),
+          event.position > 1
+            ? UI18n.t("job.status.queued_pos", { pos: event.position }, `position ${event.position}`)
+            : ""
+        );
         break;
       case "started":
-        setStatus("Starting", "");
+        setStatus(UI18n.t("job.status.starting", {}, "Starting"), "");
         break;
       case "loading":
-        setStatus("Loading model", event.model?.model || "");
+        setStatus(UI18n.t("job.status.loading", {}, "Loading model"), event.model?.model || "");
         setProgress(null);
         break;
       case "loaded":
-        setStatus("Model loaded", `${event.seconds}s`);
+        setStatus(UI18n.t("job.status.loaded", {}, "Model loaded"), `${event.seconds}s`);
         break;
       case "model_cached":
-        setStatus("Model ready", "already in memory");
+        setStatus(
+          UI18n.t("job.status.ready", {}, "Model ready"),
+          UI18n.t("job.status.in_memory", {}, "already in memory")
+        );
         break;
       case "seed_queued":
-        job.imageLabel = event.count > 1 ? `image ${event.index + 1}/${event.count} · ` : "";
+        job.imageLabel =
+          event.count > 1
+            ? UI18n.t(
+                "job.status.image_label",
+                { index: event.index + 1, count: event.count },
+                `image ${event.index + 1}/${event.count} · `
+              )
+            : "";
         job.seed = event.seed;
         break;
       case "progress": {
-        const rate = event.rate ? (event.rate >= 1 ? `${event.rate.toFixed(2)} it/s` : `${(1 / event.rate).toFixed(1)} s/it`) : "";
+        const rate = event.rate
+          ? event.rate >= 1
+            ? `${event.rate.toFixed(2)} it/s`
+            : `${(1 / event.rate).toFixed(1)} s/it`
+          : "";
         const remaining = event.rate ? Math.max(0, (event.total - event.step) / event.rate) : null;
-        const eta = remaining !== null ? ` · ${formatSeconds(remaining)} left` : "";
-        setStatus("Generating", `${job.imageLabel || ""}step ${event.step}/${event.total}${rate ? ` · ${rate}` : ""}${eta} · seed ${event.seed}`);
+        const eta =
+          remaining !== null
+            ? UI18n.t("job.status.time_left", { time: formatSeconds(remaining) }, ` · ${formatSeconds(remaining)} left`)
+            : "";
+        const stepStr = UI18n.t("job.status.step", { step: event.step, total: event.total }, `step ${event.step}/${event.total}`);
+        const seedStr = UI18n.t("job.status.seed", { seed: event.seed }, ` · seed ${event.seed}`);
+        setStatus(
+          UI18n.t("job.status.generating", {}, "Generating"),
+          `${job.imageLabel || ""}${stepStr}${rate ? ` · ${rate}` : ""}${eta}${seedStr}`
+        );
         setProgress(event.step / event.total);
         break;
       }
@@ -416,7 +643,10 @@
         showImage(`/api/jobs/${job.id}/preview.jpg?step=${event.seed}-${event.step}`, true);
         break;
       case "decoding":
-        setStatus("Decoding", `seed ${event.seed}`);
+        setStatus(
+          UI18n.t("job.status.decoding", {}, "Decoding"),
+          UI18n.t("job.status.decoding_detail", { seed: event.seed }, `seed ${event.seed}`)
+        );
         break;
       case "image":
         addResult(event.name);
@@ -424,16 +654,26 @@
         break;
       case "done":
         finish(job, "done");
-        setStatus("Done", `${event.images.length} image${event.images.length === 1 ? "" : "s"} saved`);
+        setStatus(
+          UI18n.t("job.status.done", {}, "Done"),
+          UI18n.t(
+            "job.status.saved_count",
+            { count: event.images.length, plural: event.images.length === 1 ? "" : "s" },
+            `${event.images.length} image${event.images.length === 1 ? "" : "s"} saved`
+          )
+        );
         setProgress(1);
         break;
       case "cancelled":
         finish(job, "cancelled");
-        setStatus("Cancelled", event.message || "");
+        job.error = event.message;
+        setStatus(UI18n.t("job.status.cancelled", {}, "Cancelled"), event.message || "");
+        setProgress(0);
         break;
       case "error":
         finish(job, "error");
-        setStatus("Failed", "");
+        job.error = event.message;
+        setStatus(UI18n.t("job.status.failed", {}, "Failed"), event.message || "");
         showError(event.message);
         setProgress(0);
         break;
@@ -466,42 +706,82 @@
   }
 
   function addResult(name) {
+    if ([...document.querySelectorAll("#job-results img")].some((img) => img.alt === name)) return;
     const src = `/api/images/${encodeURIComponent(name)}`;
-    const thumb = el("img", { src, alt: name, title: name, onclick: () => {
-      showImage(src, false);
-      document.querySelectorAll("#job-results img").forEach((i) => i.classList.toggle("active", i === thumb));
-    } });
+    const thumb = el("img", {
+      src,
+      alt: name,
+      title: name,
+      onclick: () => {
+        showImage(src, false);
+        document.querySelectorAll("#job-results img").forEach((i) => i.classList.toggle("active", i === thumb));
+      },
+    });
     $("job-results").append(thumb);
   }
 
   async function refreshJobs() {
     try {
       const { jobs } = await MF.api("/api/jobs");
-      $("job-list").replaceChildren(...jobs.slice(0, 20).map((job) => {
-        const thumb = job.images.length
-          ? el("img", { src: `/api/images/${encodeURIComponent(job.images[0])}`, alt: "", onerror: (e) => e.target.classList.add("thumb-missing") })
-          : el("div", { class: "thumb-placeholder" });
-        return el("li", { onclick: () => track(job), title: job.prompt },
-          thumb,
-          el("div", {}, el("div", { class: "job-prompt", text: job.prompt || "(no prompt)" }), el("div", { class: "job-sub", text: `${prettyCommand(job.command)} · ${new Date(job.created_at * 1000).toLocaleTimeString()}` })),
-          el("span", { class: `state ${job.status}`, text: job.status }),
+      $("job-list").replaceChildren(
+        ...jobs.slice(0, 20).map((job) => {
+          const thumb = job.images.length
+            ? el("img", {
+                src: `/api/images/${encodeURIComponent(job.images[0])}`,
+                alt: "",
+                onerror: (e) => e.target.classList.add("thumb-missing"),
+              })
+            : el("div", { class: "thumb-placeholder" });
+          const promptText = job.prompt || UI18n.t("history.no_prompt", {}, "(no prompt)");
+          return el(
+            "li",
+            { onclick: () => track(job), title: job.prompt },
+            thumb,
+            el(
+              "div",
+              {},
+              el("div", { class: "job-prompt", text: promptText }),
+              el("div", {
+                class: "job-sub",
+                text: `${prettyCommand(job.command)} · ${new Date(job.created_at * 1000).toLocaleTimeString()}`,
+              })
+            ),
+            el("span", { class: `state ${job.status}`, text: job.status })
+          );
+        })
+      );
+      if (!jobs.length) {
+        $("job-list").replaceChildren(
+          el("li", {
+            class: "muted empty",
+            "data-i18n": "history.empty",
+            "data-i18n-default": "No jobs yet.",
+            text: UI18n.t("history.empty", {}, "No jobs yet."),
+          })
         );
-      }));
-      if (!jobs.length) $("job-list").replaceChildren(el("li", { class: "muted empty", text: "No jobs yet." }));
+      }
     } catch { /* shown on next refresh */ }
   }
 
   async function clearHistory() {
-    if (!window.confirm("Clear job history? This forgets finished jobs, deletes their uploaded init images and removes saved form drafts from this browser. Images in the gallery are kept.")) return;
+    const confirmMsg = UI18n.t(
+      "history.clear_confirm",
+      {},
+      "Clear job history? This forgets finished jobs, deletes their uploaded init images and removes saved form drafts from this browser. Images in the gallery are kept."
+    );
+    if (!window.confirm(confirmMsg)) return;
     try {
       const result = await MF.api("/api/jobs", { method: "DELETE" });
       clearStoredDrafts();
-      // The server deleted every upload not used by a queued or running job, which
-      // includes the init image still set in this form.
       if (result.removed_uploads) setUpload(null);
       if (state.activeJob && ["done", "error", "cancelled"].includes(state.activeJob.status)) resetStage();
       refreshJobs();
-      MF.toast(`Cleared ${result.cleared_jobs} job${result.cleared_jobs === 1 ? "" : "s"}`);
+      const clearedMsg = UI18n.t(
+        "history.cleared_toast",
+        { count: result.cleared_jobs, plural: result.cleared_jobs === 1 ? "" : "s" },
+        `Cleared ${result.cleared_jobs} job${result.cleared_jobs === 1 ? "" : "s"}`
+      );
+      MF.toast(clearedMsg);
     } catch (exc) {
       showError(exc.message);
     }
@@ -566,7 +846,10 @@
     $("cancel-job").addEventListener("click", async () => {
       if (!state.activeJob) return;
       await MF.api(`/api/jobs/${state.activeJob.id}/cancel`, { method: "POST" });
-      setStatus("Cancelling", "stops after the current step");
+      setStatus(
+        UI18n.t("job.status.cancelling", {}, "Cancelling"),
+        UI18n.t("job.status.cancelling_detail", {}, "stops after the current step")
+      );
     });
     $("copy-command").addEventListener("click", async () => {
       showError("");
@@ -586,6 +869,39 @@
     });
     $("generate-form").addEventListener("input", () => { state.skipSave = false; });
     window.addEventListener("beforeunload", saveForm);
+
+    document.addEventListener("languagechange", () => {
+      const mpSelect = $("megapixels");
+      if (mpSelect) {
+        const currentMp = Number(mpSelect.value);
+        mpSelect.replaceChildren(...renderMegapixelOptions(currentMp));
+      }
+      renderRatioOptions();
+      updateStepsPlaceholder();
+      updateNotes();
+      const emptyJob = document.querySelector("#job-list .empty");
+      if (emptyJob) emptyJob.textContent = UI18n.t("history.empty", {}, "No jobs yet.");
+      if (!state.upload) {
+        $("dropzone-text").textContent = UI18n.t("form.dropzone_text", {}, "Drop an image or click to choose");
+      }
+      if (state.activeJob) {
+        if (state.activeJob._lastEvent) {
+          renderEventStatus(state.activeJob, state.activeJob._lastEvent);
+        } else if (["done", "error", "cancelled"].includes(state.activeJob.status)) {
+          let detail = state.activeJob.error || "";
+          if (state.activeJob.status === "done" && !detail && state.activeJob.images) {
+            detail = UI18n.t(
+              "job.status.saved_count",
+              { count: state.activeJob.images.length, plural: state.activeJob.images.length === 1 ? "" : "s" },
+              `${state.activeJob.images.length} image${state.activeJob.images.length === 1 ? "" : "s"} saved`
+            );
+          }
+          const statusKey =
+            state.activeJob.status === "error" ? "job.status.failed" : `job.status.${state.activeJob.status}`;
+          setStatus(UI18n.t(statusKey, {}, capitalize(state.activeJob.status)), detail);
+        }
+      }
+    });
   }
 
   async function start() {
@@ -604,7 +920,7 @@
       : storage("get", `${STORAGE_PREFIX}form:${lastCommand}`) || null;
     if (initial && commandSpec(initial.command)) applyPayload(initial);
     else renderCommand((commandSpec("mflux-generate-qwen-2.1") || state.commands.find((c) => c.available)).command);
-    if (reuse) MF.toast("Settings loaded from gallery");
+    if (reuse) MF.toast(UI18n.t("gallery.loaded_toast", {}, "Settings loaded from gallery"));
 
     refreshJobs();
     const running = (await MF.api("/api/jobs")).jobs.find((j) => j.status === "running" || j.status === "queued");

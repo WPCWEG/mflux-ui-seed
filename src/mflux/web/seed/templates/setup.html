@@ -1,19 +1,20 @@
 {% extends "base.html" %}
-{% block title %}Set up · mflux{% endblock %}
+{% block title_key %}setup.title{% endblock %}
+{% block title %}{{ t('setup.title') }} · mflux{% endblock %}
 {% block main_class %}auth-layout{% endblock %}
 {% block content %}
 <form id="setup-form" class="panel auth-card">
-  <h1>Create an API key</h1>
-  <p class="hint">This server requires a login. Choose a key: at least 12 printable ASCII characters, no spaces. It is stored hashed.</p>
+  <h1 data-i18n="setup.heading">{{ t('setup.heading') }}</h1>
+  <p class="hint" data-i18n="setup.hint">{{ t('setup.hint') }}</p>
   <label class="field">
-    <span class="label">API key</span>
+    <span class="label" data-i18n="setup.api_key">{{ t('setup.api_key') }}</span>
     <input type="password" id="api-key" autocomplete="new-password" required autofocus>
   </label>
   <label class="field">
-    <span class="label">Repeat</span>
+    <span class="label" data-i18n="setup.repeat">{{ t('setup.repeat') }}</span>
     <input type="password" id="api-key-confirm" autocomplete="new-password" required>
   </label>
-  <button type="submit" class="primary">Save and log in</button>
+  <button type="submit" class="primary" data-i18n="setup.submit">{{ t('setup.submit') }}</button>
   <p id="auth-error" class="error" hidden></p>
 </form>
 {% endblock %}

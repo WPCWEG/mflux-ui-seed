@@ -37,7 +37,7 @@ class FormSchema:
         ),
     }
     LABELS = {
-        "--mlx-cache-limit-gb": "MLX cache limit (GB)",
+        "--mlx-cache-limit-gb": "MLX cache limit (GiB)",
         "--vae-tiling": "VAE tiling",
         "--vae-tile-size": "VAE tile size",
         "--pid-decode": "PiD decode",
@@ -78,7 +78,10 @@ class FormSchema:
             if field is not None:
                 fields.append(field)
         models = [
-            {"name": model, "default_steps": ui_defaults.model_inference_steps(model)}
+            {
+                "name": model,
+                "default_steps": 8 if "turbo" in model else ui_defaults.model_inference_steps(model),
+            }
             for model in adapter.builtin_models
         ]
         return {
@@ -104,6 +107,11 @@ class FormSchema:
             "group": FormSchema._group(flag),
             "status": option["status"],
         }
+        if adapter.command.startswith("mflux-generate-z-image"):
+            if flag == "--vae-tiling":
+                field["default"] = True
+            elif flag == "--vae-tile-size":
+                field["default"] = 512
         if option["status"] == "conditional":
             field["condition"] = f"Honoured when {option['condition']}. {option.get('reason', '')}".strip()
         if flag in FormSchema.SPECIAL_FLAGS:

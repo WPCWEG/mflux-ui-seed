@@ -277,6 +277,7 @@ def main() -> None:
         ssl_certfile=str(settings.tls_certfile) if settings.tls_certfile else None,
         ssl_keyfile=str(settings.tls_keyfile) if settings.tls_keyfile else None,
         proxy_headers=False,
+        timeout_graceful_shutdown=15,
     )
     # uvicorn.Config sets up its loggers on construction, so the filter goes on afterwards.
     if args.log_level != "debug":

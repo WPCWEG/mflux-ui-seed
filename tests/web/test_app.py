@@ -320,3 +320,13 @@ def test_malformed_generate_payload_is_a_client_error(tmp_path, extra):
     client = TestClient(web.app, base_url=BASE, client=("127.0.0.1", 50000), raise_server_exceptions=False)
     body = {"command": "mflux-generate-z-image-turbo", "options": {"--prompt": "x"}, **extra}
     assert client.post("/api/generate", json=body, headers=csrf(client)).status_code == 400
+
+
+def test_generate_returns_503_when_server_is_stopping(tmp_path):
+    web = make_app(tmp_path)
+    client = client_for(web)
+    web.runner._stopping = True
+    body = {"command": "mflux-generate-z-image-turbo", "options": {"--prompt": "x"}}
+    response = client.post("/api/generate", json=body, headers=csrf(client))
+    assert response.status_code == 503
+    assert "stopping" in response.json()["detail"]

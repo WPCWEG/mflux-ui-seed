@@ -1,26 +1,27 @@
 {% extends "base.html" %}
-{% block title %}Generate · mflux{% endblock %}
+{% block title_key %}generate.title{% endblock %}
+{% block title %}{{ t('generate.title') }} · mflux{% endblock %}
 {% block main_class %}generate-layout{% endblock %}
 {% block content %}
 <form id="generate-form" class="panel form-panel" autocomplete="off" novalidate>
   <section class="field-group grid-2">
     <label class="field">
-      <span class="label">Model family</span>
+      <span class="label" data-i18n="form.model_family">{{ t('form.model_family') }}</span>
       <select id="command"></select>
       <small id="command-description" class="hint"></small>
     </label>
 
     <div class="field">
-      <span class="label">Weights</span>
+      <span class="label" data-i18n="form.weights">{{ t('form.weights') }}</span>
       <div class="segmented" id="model-source" role="radiogroup">
-        <label><input type="radio" name="model-source" value="builtin" checked><span>Built-in</span></label>
-        <label><input type="radio" name="model-source" value="local"><span>Local folder</span></label>
-        <label><input type="radio" name="model-source" value="hf"><span>Hugging Face</span></label>
+        <label><input type="radio" name="model-source" value="builtin" checked><span data-i18n="form.weights_builtin">{{ t('form.weights_builtin') }}</span></label>
+        <label><input type="radio" name="model-source" value="local"><span data-i18n="form.weights_local">{{ t('form.weights_local') }}</span></label>
+        <label><input type="radio" name="model-source" value="hf"><span data-i18n="form.weights_hf">{{ t('form.weights_hf') }}</span></label>
       </div>
       <select id="model-builtin" class="source-input" data-source="builtin"></select>
       <select id="model-local" class="source-input" data-source="local" hidden></select>
-      <input id="model-hf" class="source-input" data-source="hf" placeholder="org/model-name" hidden>
-      <small id="model-local-empty" class="hint" hidden>No local models found. Start mflux-web with <code>--models-dir DIR</code>.</small>
+      <input id="model-hf" class="source-input" data-source="hf" placeholder="{{ t('form.model_hf_placeholder') }}" data-i18n-placeholder="form.model_hf_placeholder" hidden>
+      <small id="model-local-empty" class="hint" hidden data-i18n="form.model_local_empty">{{ t('form.model_local_empty') }}</small>
     </div>
     <div id="group-model" class="grid-2 wide"></div>
   </section>
@@ -30,62 +31,62 @@
   <section class="field-group">
     <div class="grid-2">
       <label class="field">
-        <span class="label">Seeds</span>
-        <input id="seeds" placeholder="random" inputmode="numeric">
-        <small class="hint">Comma-separated for several images. Empty picks one at random.</small>
+        <span class="label" data-i18n="form.seeds">{{ t('form.seeds') }}</span>
+        <input id="seeds" placeholder="{{ t('form.seeds_placeholder') }}" data-i18n-placeholder="form.seeds_placeholder" inputmode="numeric">
+        <small class="hint" data-i18n="form.seeds_hint">{{ t('form.seeds_hint') }}</small>
       </label>
       <label class="field">
-        <span class="label">Live preview</span>
+        <span class="label" data-i18n="form.live_preview">{{ t('form.live_preview') }}</span>
         <select id="preview-every">
-          <option value="0">Off</option>
-          <option value="1">Every step</option>
-          <option value="2">Every 2 steps</option>
-          <option value="5">Every 5 steps</option>
-          <option value="10">Every 10 steps</option>
+          <option value="0" data-i18n="preview.off">{{ t('preview.off') }}</option>
+          <option value="1" data-i18n="preview.every_step">{{ t('preview.every_step') }}</option>
+          <option value="2" data-i18n="preview.every_2_steps">{{ t('preview.every_2_steps') }}</option>
+          <option value="5" data-i18n="preview.every_5_steps">{{ t('preview.every_5_steps') }}</option>
+          <option value="10" data-i18n="preview.every_10_steps">{{ t('preview.every_10_steps') }}</option>
         </select>
-        <small class="hint">Each preview costs a VAE decode.</small>
+        <small class="hint" data-i18n="form.live_preview_hint">{{ t('form.live_preview_hint') }}</small>
       </label>
     </div>
   </section>
 
   <details class="field-group collapsible" id="img2img-section">
-    <summary>Init image <span class="summary-note" id="img2img-note"></span></summary>
+    <summary><span data-i18n="section.init_image">{{ t('section.init_image') }}</span> <span class="summary-note" id="img2img-note"></span></summary>
     <div class="dropzone" id="dropzone">
       <input type="file" id="init-image" accept="image/png,image/jpeg,image/webp">
       <img id="init-preview" alt="" hidden>
-      <span id="dropzone-text">Drop an image or click to choose</span>
+      <span id="dropzone-text" data-i18n="form.dropzone_text">{{ t('form.dropzone_text') }}</span>
     </div>
     <div class="grid-2">
       <label class="field">
-        <span class="label">Strength <output id="strength-value">0.4</output></span>
+        <span class="label"><span data-i18n="form.strength">{{ t('form.strength') }}</span> <output id="strength-value">0.4</output></span>
         <input type="range" id="init-strength" min="0" max="1" step="0.05" value="0.4">
       </label>
-      <div class="field align-end"><button type="button" class="ghost small" id="clear-image">Remove image</button></div>
+      <div class="field align-end"><button type="button" class="ghost small" id="clear-image" data-i18n="form.clear_image">{{ t('form.clear_image') }}</button></div>
     </div>
   </details>
 
   <details class="field-group collapsible" id="lora-section">
-    <summary>LoRAs <span class="summary-note" id="lora-note"></span></summary>
+    <summary><span data-i18n="section.loras">{{ t('section.loras') }}</span> <span class="summary-note" id="lora-note"></span></summary>
     <div id="lora-rows"></div>
     <datalist id="lora-options"></datalist>
-    <button type="button" class="ghost small" id="add-lora">Add LoRA</button>
-    <small class="hint">A file under <code>--lora-dir</code>, a Hugging Face repo, <code>repo:file.safetensors</code>, or a library name.</small>
+    <button type="button" class="ghost small" id="add-lora" data-i18n="form.add_lora">{{ t('form.add_lora') }}</button>
+    <small class="hint" data-i18n="form.lora_hint">{{ t('form.lora_hint') }}</small>
   </details>
 
   <details class="field-group collapsible">
-    <summary>Memory</summary>
+    <summary data-i18n="section.memory">{{ t('section.memory') }}</summary>
     <div id="group-memory" class="grid-2"></div>
   </details>
 
   <details class="field-group collapsible">
-    <summary>Advanced</summary>
+    <summary data-i18n="section.advanced">{{ t('section.advanced') }}</summary>
     <div id="group-advanced" class="grid-2"></div>
   </details>
 
   <div class="actions">
-    <button type="submit" id="generate" class="primary">Generate</button>
-    <button type="button" id="copy-command" class="ghost">Copy CLI command</button>
-    <button type="button" id="reset-form" class="ghost">Reset</button>
+    <button type="submit" id="generate" class="primary" data-i18n="form.generate">{{ t('form.generate') }}</button>
+    <button type="button" id="copy-command" class="ghost" data-i18n="form.copy_command">{{ t('form.copy_command') }}</button>
+    <button type="button" id="reset-form" class="ghost" data-i18n="form.reset">{{ t('form.reset') }}</button>
   </div>
   <p id="form-error" class="error" hidden></p>
   <p id="form-warnings" class="warning" hidden></p>
@@ -94,15 +95,15 @@
 <section class="output-column">
   <div class="panel stage" id="stage">
     <div class="stage-empty" id="stage-empty">
-      <p>Your image appears here.</p>
-      <p class="hint">The first run loads the model, which can take a while. The next runs with the same model reuse it.</p>
+      <p data-i18n="stage.empty_title">{{ t('stage.empty_title') }}</p>
+      <p class="hint" data-i18n="stage.empty_hint">{{ t('stage.empty_hint') }}</p>
     </div>
     <img id="stage-image" alt="" hidden>
     <div class="stage-meta" id="stage-meta" hidden>
       <div class="row">
-        <strong id="job-status">Queued</strong>
+        <strong id="job-status" data-i18n="job.queued">{{ t('job.queued') }}</strong>
         <span id="job-detail" class="muted"></span>
-        <button type="button" id="cancel-job" class="ghost small danger">Cancel</button>
+        <button type="button" id="cancel-job" class="ghost small danger" data-i18n="job.cancel">{{ t('job.cancel') }}</button>
       </div>
       <div class="progress" aria-hidden="true"><div id="progress-bar"></div></div>
       <div id="job-results" class="thumbs"></div>
@@ -111,8 +112,8 @@
   </div>
   <div class="panel">
     <div class="panel-title row-between">
-      <span>Recent jobs</span>
-      <button type="button" id="clear-history" class="ghost small" title="Forget finished jobs, their uploaded init images and saved form drafts. Gallery images are kept.">Clear history</button>
+      <span data-i18n="history.title">{{ t('history.title') }}</span>
+      <button type="button" id="clear-history" class="ghost small" title="{{ t('history.clear_title') }}" data-i18n-title="history.clear_title" data-i18n="history.clear">{{ t('history.clear') }}</button>
     </div>
     <ul id="job-list" class="job-list"></ul>
   </div>

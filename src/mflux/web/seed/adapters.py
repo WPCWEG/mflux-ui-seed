@@ -192,19 +192,40 @@ class ZImageAdapter(CommandAdapter):
     module = "mflux.models.z_image.cli.z_image_generate"
     latent_creator_path = "mflux.models.z_image.latent_creator.ZImageLatentCreator"
     builtin_models = ("z-image", "z-image-turbo")
-    default_scheduler = "flow_match_euler_discrete"
+    default_scheduler = None  # Resolved dynamically based on the resolved model variant
 
     def validate(self, args: Namespace) -> None:
         super().validate(args)
-        self.restricted_config(args, "z-image", ("z-image-turbo",))
+        model_config = self.restricted_config(args, "z-image", ("z-image-turbo",))
+        is_turbo = not model_config.supports_guidance or "turbo" in model_config.model_name.lower()
+
+        # Scheduler resolution based on the resolved model variant:
+        # Z-Image Turbo defaults to linear; Z-Image Base defaults to flow_match_euler_discrete.
+        # User explicit choice is preserved.
+        if "--scheduler" not in args.web_provided_flags:
+            args.scheduler = "linear" if is_turbo else "flow_match_euler_discrete"
+
+        # Steps resolution based on the resolved model variant:
+        # Z-Image Turbo defaults to 8; Z-Image Base defaults to 50.
+        # User explicit choice is preserved.
+        if "--steps" not in args.web_provided_flags or args.steps is None:
+            args.steps = 8 if is_turbo else 50
 
     def load(self, args: Namespace):
+        import mlx.core as mx
         from mflux.models.z_image.variants.z_image import ZImage
 
         model_config = self.restricted_config(args, "z-image", ("z-image-turbo",))
-        return ZImage(
-            model_config=model_config, quantize=args.quantize, model_path=args.model_path, **self.lora_kwargs(args)
+        model = ZImage(
+            model_config=model_config,
+            quantize=args.quantize,
+            model_path=args.model_path,
+            float32=getattr(args, "float32", False),
+            compute_precision=getattr(args, "compute_precision", None),
+            **self.lora_kwargs(args),
         )
+        mx.eval(model.parameters())
+        return model
 
 
 class ZImageTurboAdapter(CommandAdapter):
@@ -212,19 +233,29 @@ class ZImageTurboAdapter(CommandAdapter):
     module = "mflux.models.z_image.cli.z_image_turbo_generate"
     latent_creator_path = "mflux.models.z_image.latent_creator.ZImageLatentCreator"
     builtin_models = ("z-image-turbo",)
+    default_scheduler = "linear"
 
     def validate(self, args: Namespace) -> None:
         self._config(args)
+        if "--scheduler" not in args.web_provided_flags:
+            args.scheduler = "linear"
+        if "--steps" not in args.web_provided_flags or args.steps is None:
+            args.steps = 8
 
     def load(self, args: Namespace):
+        import mlx.core as mx
         from mflux.models.z_image.variants.z_image import ZImage
 
-        return ZImage(
+        model = ZImage(
             model_config=self._config(args),
             quantize=args.quantize,
             model_path=args.model_path,
+            float32=getattr(args, "float32", False),
+            compute_precision=getattr(args, "compute_precision", None),
             **self.lora_kwargs(args),
         )
+        mx.eval(model.parameters())
+        return model
 
     @staticmethod
     def _config(args: Namespace):
